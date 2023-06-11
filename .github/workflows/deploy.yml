@@ -1,0 +1,51 @@
+name: Build and deploy
+on:
+  push:
+    branches:
+      - main
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: app
+          POSTGRES_PASSWORD: pass
+          POSTGRES_DB: db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    steps:
+      - name: 'Install PostgreSQL client'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+
+      - name: 'Checkout the repo'
+        uses: actions/checkout@v3
+
+      - name: 'Setup database'
+        run: | 
+          psql -f docker-entrypoint-initdb.d/00_schema.sql postgresql://app:pass@localhost:5432/db
+          psql -f docker-entrypoint-initdb.d/01_data.sql postgresql://app:pass@localhost:5432/db
+
+      - name: 'Set tag'
+        run: echo "BUILD_TAG=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
+      - name: 'Login to GHCR'
+        uses: docker/login-action@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      - name: 'Build image '
+        run: |
+          docker buildx build --network host --tag ghcr.io/${{ github.actor }}/04-02-all:${BUILD_TAG} --tag ghcr.io/${{ github.actor }}/04-02-all:latest .
+          docker push ghcr.io/${{ github.actor }}/04-02-all:${BUILD_TAG}
+          docker push ghcr.io/${{ github.actor }}/04-02-all:latest
