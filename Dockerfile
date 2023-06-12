@@ -27,6 +27,7 @@ ENV POSTGRES_PASSWORD=pass
 ENV POSTGRES_USER=app
 ENV POSTGRES_DB=db
 
+COPY docker-entrypoint-initdb.d /docker-entrypoint-initdb.d
 COPY --from=builder /app/target/app.jar /app.jar
 COPY --from=builder /opt/java/openjdk /opt/java/openjdk
 COPY --chmod=777 app-entrypoint.sh /usr/local/bin/app-entrypoint.sh
